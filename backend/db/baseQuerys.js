@@ -44,6 +44,25 @@ export class BaseQuerys {
     }
   }
 
+  // Função que seleciona os dados com uma condição
+  async selectByValue(condition) {
+    try {
+      const conditionKeys = Object.keys(condition);
+      const conditionPlaceholders = conditionKeys
+        .map((key, index) => `${key} = $${index + 1}`)
+        .join(' AND ');
+
+      const queryValues = Object.values(condition);
+
+      const queryText = `SELECT ${this.columns} FROM ${this.table} WHERE ${conditionPlaceholders} LIMIT 1`;
+
+      const result = await pool.query(queryText, queryValues);
+      return result.rows.length > 0 ? result.rows : [];
+    } catch (error) {
+      throw new Error(`Erro ao buscar item específico: ${error.message}`);
+    }
+  }
+
   // Função que faz a inserção de dados em uma determinada tabela
   async insertValues(values) {
     const client = await pool.connect();
@@ -112,7 +131,6 @@ export class BaseQuerys {
     }
   }
 
-
   // Deletar dados
   /*
   const baseQuery = new BaseQuerys('users', 'id, nome, email');
@@ -150,29 +168,56 @@ export class BaseQuerys {
   }
 
 
-
   // Função que faz a validação dos parâmetros passados para o construtor
   validateParameter(table, columns) {
-    if (typeof table !== 'string' || (table !== 'users' && table !== 'tasks')) {
-      throw new Error('As tabelas passadas por parâmetro são inválidas');
+    if (typeof table !== "string" || (table !== "users" && table !== "tasks")) {
+      throw new Error("As tabelas passadas por parâmetro são inválidas");
     }
 
-    if (typeof columns !== 'string') {
-      throw new Error('As colunas devem ser passadas como uma string no formato: column1, column2, column3,...');
+    if (typeof columns !== "string") {
+      throw new Error(
+        "As colunas devem ser passadas como uma string no formato: column1, column2, column3,..."
+      );
     }
 
-    const columnsValid = ['id', 'user_id', 'nome', 'email', 'password', 'created_at', 'updated_at', 'title', 'description', 'status', 'due_date'];
+    const columnsValid = [
+      "id",
+      "user_id",
+      "nome",
+      "email",
+      "password",
+      "created_at",
+      "updated_at",
+      "title",
+      "description",
+      "status",
+      "due_date",
+    ];
     const arrColumns = columns.split(/\s*,\s*/);
 
-    const isValid = arrColumns.every(column => columnsValid.includes(column));
+    const isValid = arrColumns.every((column) =>
+      columnsValid.includes(column)
+    );
     if (!isValid) {
-      throw new Error('As colunas passadas são inválidas');
+      throw new Error("As colunas passadas são inválidas");
     }
   }
 
 }
 
 /*
+
+// Selecionar items especificos
+try {
+  const base = new BaseQuerys("users", "id, nome, email");
+  const result1 = await base.selectByValue({ nome: "Jefferson" });
+  const result2 = await base.selectByValue({ id: "e1d0832a-3942-4076-9c69-88073ca77e9f" }, 1);
+  console.log(result1);
+  console.log(result2);
+} catch (error) {
+  console.log(error);
+}
+
 Selecionar tudo:
 try {
   const bse = new BaseQuerys('users', 'id');
@@ -198,8 +243,8 @@ try {
 // try {
 //   const bse = new BaseQuerys('users', 'nome, email, password');
 //   const result = await bse.insertValues([
-//     'Túlio Mota', 
-//     'tuliomotaa90@gmail.com', 
+//     'Túlio Mota',
+//     'tuliomotaa90@gmail.com',
 //     '900000056'
 //   ]);
 //   if (!result) {

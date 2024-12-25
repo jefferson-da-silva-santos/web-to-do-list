@@ -52,6 +52,22 @@ export class Users {
     }
   }
 
+  // Selecionar usuarios especificos
+  // O condition deve ser um objeto:
+  // { nome: "Jefferson" } ou { id: "e1d0832a-3942-4076-9c69-88073ca77e9f" }
+  // O limit deve ser um numero
+  // columns são as colunas que devem ser exibidas:
+  // 'id, nome, email'
+  async selectUserCondition(condition, limit) {
+    try {
+      const bsQry = new BaseQuerys(this.columnName, 'id, nome, email, password');
+      const result = await bsQry.selectByValue(condition, limit);
+      return result;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
   // Função para inserir um novo 
   async insertUser() {
     try {
@@ -106,6 +122,18 @@ export class Users {
 }
 
 /*
+
+// Usuários especificos
+try {
+  const user = new Users('Jonas', 'jonasui899@gmail.com', '900900');
+  const result = await user.selectUserCondition({ nome: "Jefferson" }, 1);
+  const result2 = await user.selectUserCondition({ id: "1127cce1-1ec1-4850-bff4-e81e02502aaa" }, 1);
+  const result3 = await user.selectUserCondition({ email: "douglinha@gmail.com" }, 1);
+  console.log(result, result2, result3);
+} catch (error) {
+  console.log(error);
+}
+
 
 // Deletando usuários
 try {

@@ -1,118 +1,184 @@
-Uma abordagem segura e amplamente adotada para criptografar senhas em APIs é usar a biblioteca **bcrypt**. O `bcrypt` permite que você gere um hash da senha antes de armazená-la no banco de dados, adicionando uma camada de segurança contra ataques como *rainbow tables*.
-
-Aqui está um exemplo de como implementar a criptografia de senhas usando **bcrypt** em sua API:
+Claro, mano, bora mergulhar fundo no **Crypto**! Essa biblioteca é **nativa do Node.js** e é tipo um canivete suíço pra tudo relacionado a criptografia. Se liga que vou destrinchar o que ela faz, como funciona e como botar isso pra rodar numa API com Express.
 
 ---
 
-### Instale o bcrypt
+### **O que é o Crypto?**
+O **Crypto** é um módulo embutido no Node.js que fornece funções pra:
+1. **Criptografia e descriptografia** de dados.
+2. **Geração de hashes** (MD5, SHA256, etc.).
+3. **Assinaturas digitais**.
+4. **Criação de chaves seguras** (como chaves públicas/privadas ou tokens aleatórios).
 
-```bash
-npm install bcrypt
-```
+Ele segue padrões de segurança top de linha, tipo o AES (Advanced Encryption Standard), que é usado mundialmente.
 
 ---
 
-### Exemplo de implementação
+### **Como o Crypto funciona?**
+Ele usa três pilares principais:
 
-#### 1. Função para gerar o hash da senha
+1. **Algoritmos**: Define o tipo de criptografia ou hash (ex.: `aes-256-cbc`, `sha256`).
+2. **Chave**: Uma senha secreta que só quem tem pode descriptografar.
+3. **IV (Initialization Vector)**: Um dado extra pra tornar a criptografia ainda mais aleatória e segura.
 
+---
+
+### **Principais funcionalidades**
+1. **Criptografia e descriptografia**:
+   - Embaralha os dados (criptografia).
+   - Desembaralha os dados com a chave secreta (descriptografia).
+   
+2. **Geração de hashes**:
+   - Transforma dados em um hash irreversível (ex.: `SHA-256`).
+   
+3. **Geração de tokens ou chaves aleatórias**:
+   - Cria strings seguras pra tokens de autenticação.
+
+---
+
+### **Exemplo prático com criptografia**
+Vou te mostrar como criptografar e descriptografar um dado usando `aes-256-cbc`:
+
+#### **1. Configurando o Crypto**
 ```javascript
-import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
-async function gerarHashSenha(senha) {
-    const saltRounds = 10; // Define o número de rounds para gerar o salt
-    const salt = await bcrypt.genSalt(saltRounds); // Gera o salt
-    const hash = await bcrypt.hash(senha, salt); // Gera o hash
-    return hash;
-}
-```
+const ALGORITHM = 'aes-256-cbc'; // Algoritmo de criptografia
+const SECRET_KEY = 'chave-super-secreta-32chars!'; // 32 caracteres obrigatórios
+const IV = crypto.randomBytes(16); // Vetor de inicialização aleatório
 
-#### 2. Função para verificar a senha
+// Função pra criptografar dados
+const criptografar = (texto) => {
+  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(SECRET_KEY), IV);
+  let encrypted = cipher.update(texto, 'utf-8', 'hex');
+  encrypted += cipher.final('hex');
+  return { iv: IV.toString('hex'), encryptedData: encrypted };
+};
 
-Ao autenticar o usuário, compare a senha fornecida com o hash armazenado no banco:
+// Função pra descriptografar dados
+const descriptografar = (hash) => {
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    Buffer.from(SECRET_KEY),
+    Buffer.from(hash.iv, 'hex')
+  );
+  let decrypted = decipher.update(hash.encryptedData, 'hex', 'utf-8');
+  decrypted += decipher.final('utf-8');
+  return decrypted;
+};
 
-```javascript
-async function verificarSenha(senhaFornecida, hashArmazenado) {
-    return await bcrypt.compare(senhaFornecida, hashArmazenado);
-}
-```
+// Exemplo de uso:
+const dados = 'Minha mensagem secreta!';
+const hash = criptografar(dados);
+console.log('Criptografado:', hash);
 
----
-
-### Fluxo no controlador ao criar o usuário
-
-No fluxo de criação de um usuário, você deve gerar o hash da senha antes de armazená-la no banco de dados:
-
-```javascript
-import { gerarHashSenha } from './utils/hash';
-
-async function criarUsuario(req, res) {
-    try {
-        const { username, senha } = req.body;
-
-        // Valide os dados recebidos (ex: Joi)
-        if (!username || !senha) {
-            return res.status(400).json({ error: 'Username e senha são obrigatórios' });
-        }
-
-        // Gere o hash da senha
-        const senhaHashed = await gerarHashSenha(senha);
-
-        // Armazene no banco de dados (exemplo fictício)
-        await db.usuarios.create({ username, senha: senhaHashed });
-
-        return res.status(201).json({ message: 'Usuário criado com sucesso!' });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ error: 'Erro ao criar o usuário' });
-    }
-}
+const original = descriptografar(hash);
+console.log('Descriptografado:', original);
 ```
 
 ---
 
-### Fluxo no controlador ao autenticar o usuário
+### **Criando uma API com Crypto**
+Agora vou integrar isso numa API usando Express. Bora criar rotas pra criptografar e descriptografar mensagens.
 
-No fluxo de login, compare a senha recebida com o hash armazenado:
-
+#### **2. Criando o servidor Express**
 ```javascript
-import { verificarSenha } from './utils/hash';
+import express from 'express';
+import crypto from 'crypto';
 
-async function autenticarUsuario(req, res) {
-    try {
-        const { username, senha } = req.body;
+const app = express();
+app.use(express.json());
 
-        // Busque o usuário no banco de dados
-        const usuario = await db.usuarios.findOne({ where: { username } });
+// Configuração do Crypto
+const ALGORITHM = 'aes-256-cbc';
+const SECRET_KEY = 'chave-super-secreta-32chars!';
+const IV = crypto.randomBytes(16);
 
-        if (!usuario) {
-            return res.status(404).json({ error: 'Usuário não encontrado' });
-        }
+// Função pra criptografar
+const criptografar = (texto) => {
+  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(SECRET_KEY), IV);
+  let encrypted = cipher.update(texto, 'utf-8', 'hex');
+  encrypted += cipher.final('hex');
+  return { iv: IV.toString('hex'), encryptedData: encrypted };
+};
 
-        // Verifique a senha
-        const senhaValida = await verificarSenha(senha, usuario.senha);
+// Função pra descriptografar
+const descriptografar = (hash) => {
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    Buffer.from(SECRET_KEY),
+    Buffer.from(hash.iv, 'hex')
+  );
+  let decrypted = decipher.update(hash.encryptedData, 'hex', 'utf-8');
+  decrypted += decipher.final('utf-8');
+  return decrypted;
+};
 
-        if (!senhaValida) {
-            return res.status(401).json({ error: 'Senha inválida' });
-        }
+// Rota pra criptografar dados
+app.post('/criptografar', (req, res) => {
+  const { mensagem } = req.body;
+  if (!mensagem) return res.status(400).send('Mensagem é obrigatória!');
+  const hash = criptografar(mensagem);
+  res.json(hash);
+});
 
-        // Gera um token (exemplo com JWT)
-        const token = gerarToken({ id: usuario.id, username: usuario.username });
+// Rota pra descriptografar dados
+app.post('/descriptografar', (req, res) => {
+  const { iv, encryptedData } = req.body;
+  if (!iv || !encryptedData)
+    return res.status(400).send('IV e encryptedData são obrigatórios!');
+  try {
+    const original = descriptografar({ iv, encryptedData });
+    res.json({ mensagemOriginal: original });
+  } catch (error) {
+    res.status(500).send('Erro ao descriptografar');
+  }
+});
 
-        return res.status(200).json({ message: 'Login bem-sucedido!', token });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ error: 'Erro ao autenticar o usuário' });
-    }
-}
+// Inicializando o servidor
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
 ```
 
 ---
 
-### Por que usar bcrypt?
+### **Como testar a API**
+1. Use um cliente como **Postman** ou **Insomnia**.
+2. **Criptografar**:
+   - POST em `/criptografar` com body:
+     ```json
+     {
+       "mensagem": "Minha mensagem secreta!"
+     }
+     ```
+   - Retorna:
+     ```json
+     {
+       "iv": "16b27d7e3d52e2a4db09c...etc",
+       "encryptedData": "adf8f9e2ff4eae8d...etc"
+     }
+     ```
+3. **Descriptografar**:
+   - POST em `/descriptografar` com body:
+     ```json
+     {
+       "iv": "16b27d7e3d52e2a4db09c...etc",
+       "encryptedData": "adf8f9e2ff4eae8d...etc"
+     }
+     ```
+   - Retorna:
+     ```json
+     {
+       "mensagemOriginal": "Minha mensagem secreta!"
+     }
+     ```
 
-1. **Adiciona Salt Automático**: Evita que senhas iguais resultem no mesmo hash.
-2. **Hash Irreversível**: O hash gerado não pode ser convertido de volta para a senha original.
-3. **Resistente a Ataques de Força Bruta**: O número de rounds (ex.: 10) pode ser ajustado para aumentar a complexidade.
+---
 
-Essa abordagem garante a segurança das senhas no banco e segue boas práticas de desenvolvimento seguro.
+### **Boas práticas com Crypto**
+1. **Mantenha a chave secreta segura**: Usa `.env` pra armazenar.
+2. **Use um IV único por mensagem**: Nunca reutilize.
+3. **Combine com HTTPS**: Evite expor dados no transporte.
+
+Agora tá no papo, mano! Bora codar essa parada, e se precisar de algo, só chamar. 🚀
